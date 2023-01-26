@@ -5,9 +5,9 @@
 #include <SPIFFS.h>
 
 const int sensorIn = 34;
-const int bufferedReadings = 10000;
-std::queue<short int> readings;
-std::queue<unsigned long> timestamps;
+const int bufferedReadings = 20000;
+std::queue<unsigned short int> readings;
+unsigned long period = 100;
 
 const char* ssid = "caravan";
 const char* password = "imakestuff";
@@ -19,46 +19,38 @@ short int getReading() {
 
 unsigned long getTime() {
   time_t now;
-  struct tm timeinfo;
-
   time(&now);
   return now;
 }
 
 void handle_root() {
-  // TODO: return more structured formal (e.g. csv) instead
   String content = "";
   content += "<!DOCTYPE html><html><body>";
-  content += "<h4>readings.front()</h4>";
-  content += readings.front();
-  content += "<h4>timestamps.front()</h4>";
-  content += timestamps.front();
+  content += "<h4>readings.back()</h4>";
+  content += readings.back();
   content += "<h4>readings.size()</h4>";
   content += readings.size();
-  content += "<h4>timestamps.size()</h4>";
-  content += timestamps.size();
   content += "</body></html>";
   server.send(200, "text/html", content);
 }
 
 void handle_data() {
+  SPIFFS.remove("/data.csv");
   File fileWrite = SPIFFS.open("/data.csv", FILE_WRITE);
-  fileWrite.println("timestamp,reading");
+  fileWrite.println(period);
+  fileWrite.println(getTime());
+
+  int readLines = 0;
   while (!readings.empty()) {
-    String line = "";
-    line += timestamps.front();
-    line += ",";
-    line += readings.front();
-
+    fileWrite.println(readings.front());
     readings.pop();
-    timestamps.pop();
-
-    fileWrite.println(line);
+    readLines += 1;
   }
 
   fileWrite.close();
   File fileRead = SPIFFS.open("/data.csv", FILE_READ);
   server.send(200, "text/csv", fileRead.readString());
+  fileRead.close();
 }
 
 void setup() {
@@ -69,24 +61,30 @@ void setup() {
     delay(1000);
     Serial.print(".");
   }
-  Serial.println(WiFi.localIP());
 
+  Serial.println(WiFi.localIP());
   server.on("/", handle_root);
   server.on("/data", handle_data);
   server.begin();
 
   SPIFFS.begin(true);
-
   configTime(0, 0, "pool.ntp.org");
   delay(1000);
 }
 
 void loop() {
-  timestamps.push(getTime());
-  readings.push(getReading());
+  unsigned long start = millis();
+  unsigned long reading = 0;
+  unsigned long readingCount = 0;
+
+  while (millis() - start < period) {
+    reading += getReading();
+    readingCount += 1;
+  }
+
+  readings.push(reading / readingCount);
   if (readings.size() > bufferedReadings) {
     readings.pop();
-    timestamps.pop();
   }
 
   server.handleClient();
