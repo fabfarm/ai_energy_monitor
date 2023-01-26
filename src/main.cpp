@@ -2,18 +2,19 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <queue>
+#include <SPIFFS.h>
 
 const int sensorIn = 34;
 const int bufferedReadings = 10000;
-std::queue<float> readings;
+std::queue<short int> readings;
 std::queue<unsigned long> timestamps;
 
 const char* ssid = "caravan";
 const char* password = "imakestuff";
 WebServer server(80);
 
-float getReading() {
-  return analogRead(sensorIn) * 3.3 / 4096.;
+short int getReading() {
+  return analogRead(sensorIn);
 }
 
 unsigned long getTime() {
@@ -40,6 +41,26 @@ void handle_root() {
   server.send(200, "text/html", content);
 }
 
+void handle_data() {
+  File fileWrite = SPIFFS.open("/data.csv", FILE_WRITE);
+  fileWrite.println("timestamp,reading");
+  while (!readings.empty()) {
+    String line = "";
+    line += timestamps.front();
+    line += ",";
+    line += readings.front();
+
+    readings.pop();
+    timestamps.pop();
+
+    fileWrite.println(line);
+  }
+
+  fileWrite.close();
+  File fileRead = SPIFFS.open("/data.csv", FILE_READ);
+  server.send(200, "text/csv", fileRead.readString());
+}
+
 void setup() {
   Serial.begin(9600);
 
@@ -51,10 +72,12 @@ void setup() {
   Serial.println(WiFi.localIP());
 
   server.on("/", handle_root);
+  server.on("/data", handle_data);
   server.begin();
 
-  configTime(0, 0, "pool.ntp.org");
+  SPIFFS.begin(true);
 
+  configTime(0, 0, "pool.ntp.org");
   delay(1000);
 }
 
