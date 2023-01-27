@@ -1,20 +1,42 @@
 #include <Arduino.h>
-#include <WiFi.h>
-#include <WebServer.h>
-#include <queue>
 #include <SPIFFS.h>
+#include <WebServer.h>
+#include <WiFi.h>
+#include <queue>
 
 const int sensorIn = 34;
 const int bufferedReadings = 20000;
-std::queue<unsigned short int> readings;
-unsigned long period = 100;
+std::queue<float> readings;
+unsigned long period = 50;
 
-const char* ssid = "caravan";
-const char* password = "imakestuff";
+const char *ssid = "caravan";
+const char *password = "imakestuff";
 WebServer server(80);
 
-short int getReading() {
-  return analogRead(sensorIn);
+float getReading() {
+  float result;
+  int readValue;
+  int maxValue = 0;
+  int minValue = 4096;
+
+  // We first get peak-to-peak voltage over period
+  uint32_t start_time = millis();
+  while ((millis() - start_time) < period) {
+    readValue = analogRead(sensorIn);
+    if (readValue > maxValue) {
+      maxValue = readValue;
+    }
+    if (readValue < minValue) {
+      minValue = readValue;
+    }
+  }
+
+  // We then convert it to power. For details refer to initial commit.
+  result = ((maxValue - minValue) * 3.3) / 4096.0;
+  result = (result / 2.0) * 0.707;
+  result = ((result * 1000) / 185) - 0.3;
+  result = (result * 240 / 1.2);
+  return result;
 }
 
 unsigned long getTime() {
@@ -73,16 +95,10 @@ void setup() {
 }
 
 void loop() {
-  unsigned long start = millis();
-  unsigned long reading = 0;
-  unsigned long readingCount = 0;
+  float reading = getReading();
 
-  while (millis() - start < period) {
-    reading += getReading();
-    readingCount += 1;
-  }
-
-  readings.push(reading / readingCount);
+  Serial.println(reading);
+  readings.push(reading);
   if (readings.size() > bufferedReadings) {
     readings.pop();
   }
