@@ -5,8 +5,10 @@
 #include <queue>
 
 const int sensorIn = 34;
-const int bufferedReadings = 20000;
+const int bufferedReadings = 10000;
 std::queue<float> readings;
+std::queue<unsigned short> timestamps;
+unsigned long timestamp;
 unsigned long period = 50;
 
 const char *ssid = "caravan";
@@ -60,19 +62,24 @@ void handle_data() {
   SPIFFS.remove("/data.csv");
   File fileWrite = SPIFFS.open("/data.csv", FILE_WRITE);
   fileWrite.println(period);
-  fileWrite.println(getTime());
+  fileWrite.println(timestamp);
 
-  int readLines = 0;
   while (!readings.empty()) {
-    fileWrite.println(readings.front());
+    String line = "";
+    line += readings.front();
+    line += ",";
+    line += timestamps.front();
+
+    fileWrite.println(line);
     readings.pop();
-    readLines += 1;
+    timestamps.pop();
   }
 
   fileWrite.close();
   File fileRead = SPIFFS.open("/data.csv", FILE_READ);
   server.send(200, "text/csv", fileRead.readString());
   fileRead.close();
+  timestamp = getTime();
 }
 
 void setup() {
@@ -92,15 +99,19 @@ void setup() {
   SPIFFS.begin(true);
   configTime(0, 0, "pool.ntp.org");
   delay(1000);
+  timestamp = getTime();
 }
 
 void loop() {
   float reading = getReading();
+  unsigned short diff = getTime() - timestamp;
 
-  Serial.println(reading);
   readings.push(reading);
+  timestamps.push(diff);
+
   if (readings.size() > bufferedReadings) {
     readings.pop();
+    timestamps.pop();
   }
 
   server.handleClient();
