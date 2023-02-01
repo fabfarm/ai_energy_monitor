@@ -88,8 +88,13 @@ void setup() {
   Serial.begin(9600);
 
   WiFiMulti wifiMulti;
-  wifiMulti.addAP("caravan", "imakestuff");
+  wifiMulti.addAP("ratinho_do_malandro", "gerryforever2018");
+  wifiMulti.addAP("fabfarm_ele_container", "imakestuff");
+  wifiMulti.addAP("liga_o_gerador", "gerryforever2018");
+  wifiMulti.addAP("caravana", "imakestuff");
   wifiMulti.addAP("fabfarm", "imakestuff");
+  wifiMulti.addAP("Raccaccoonie", "MalkovichMalkovich");
+  wifiMulti.addAP("ubnt_mesh", "gerryforever2018");
 
   if(wifiMulti.run() != WL_CONNECTED) {
     Serial.println("WiFi not connected!");
