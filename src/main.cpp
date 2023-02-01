@@ -2,7 +2,9 @@
 #include <SPIFFS.h>
 #include <WebServer.h>
 #include <WiFi.h>
+#include <WiFiMulti.h>
 #include <queue>
+#include <ElegantOTA.h>
 
 const int sensorIn = 34;
 const int bufferedReadings = 10000;
@@ -11,7 +13,7 @@ std::queue<unsigned short> timestamps;
 unsigned long timestamp;
 unsigned long period = 50;
 
-const char *ssid = "caravan";
+const char *ssid = "fabfarm";
 const char *password = "imakestuff";
 WebServer server(80);
 
@@ -85,16 +87,21 @@ void handle_data() {
 void setup() {
   Serial.begin(9600);
 
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {
+  WiFiMulti wifiMulti;
+  wifiMulti.addAP("caravan", "imakestuff");
+  wifiMulti.addAP("fabfarm", "imakestuff");
+
+  if(wifiMulti.run() != WL_CONNECTED) {
+    Serial.println("WiFi not connected!");
     delay(1000);
-    Serial.print(".");
   }
 
   Serial.println(WiFi.localIP());
   server.on("/", handle_root);
   server.on("/data", handle_data);
+  ElegantOTA.begin(&server);
   server.begin();
+
 
   SPIFFS.begin(true);
   configTime(0, 0, "pool.ntp.org");
